@@ -28,10 +28,21 @@ Nothing is saved. Add `-SaveSample` to keep a copy of the car's status with the 
 ## Building without a Mac
 GitHub Actions builds the app on a macOS runner for every push. Each build publishes an unsigned `LionClub.ipa` and Simulator screenshots as build artifacts.
 
+The newest build is always at:
+https://github.com/pokerbanana/lionclub/releases/latest/download/LionClub.ipa
+
 ## Installing on an iPhone with a free Apple ID
 Install `LionClub.ipa` with [AltStore](https://altstore.io) (AltServer for Windows) or [SideStore](https://sidestore.io).
 
 With a free Apple ID, the app has to be refreshed every 7 days. Both tools can do this automatically. Sideloadly works too, but it can strip the widget extension.
+
+## Trial build: the Checks tab
+The current build checks that everything the real app needs works on your iPhone. In the **Checks** tab:
+1. **Widget:** add the LionClub widget to the Home Screen, then tap "Send a test value to the widget". The time on the widget should change.
+2. **Face ID:** tap "Test Face ID".
+3. **Peugeot login:** tap "Open Peugeot login (Croatia)" and sign in. It should say Peugeot sent a code back.
+4. **Siri and Control Center:** say "Test LionClub" to Siri, or add the "Test LionClub" button to Control Center and tap it.
+5. **Parking spot:** allow location. Then, in Shortcuts, create an automation for when CarPlay or Bluetooth disconnects that runs "Save Parking Spot".
 
 ## License
 GPL-3.0. Third-party code and data sources are listed in [NOTICE.md](NOTICE.md).

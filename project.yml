@@ -1,0 +1,96 @@
+# XcodeGen project definition. CI runs `xcodegen generate` to create LionClub.xcodeproj,
+# so the Xcode project never has to be edited by hand (and never on Windows).
+name: LionClub
+options:
+  bundleIdPrefix: io.github.pokerbanana
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+targets:
+  LionClub:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Shared
+    dependencies:
+      - target: LionClubWidgets
+      - sdk: AppIntents.framework
+      - sdk: WidgetKit.framework
+    entitlements:
+      path: App/LionClub.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.io.github.pokerbanana.lionclub
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: LionClub
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        INAlternativeAppNames:
+          - INAlternativeAppName: Lion Club
+        NSFaceIDUsageDescription: LionClub uses Face ID to keep your car data private.
+        NSLocationWhenInUseUsageDescription: LionClub uses your location to show nearby fuel stations and to save where you parked.
+        NSLocationAlwaysAndWhenInUseUsageDescription: LionClub saves where you parked when your iPhone disconnects from the car, even when the app is closed.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.pokerbanana.lionclub
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  LionClubWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Widgets
+      - Shared
+    dependencies:
+      - sdk: AppIntents.framework
+      - sdk: WidgetKit.framework
+    entitlements:
+      path: Widgets/LionClubWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.io.github.pokerbanana.lionclub
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: LionClub
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.pokerbanana.lionclub.widgets
+  LionClubTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    dependencies:
+      - target: LionClub
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.pokerbanana.lionclub.tests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/LionClub.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LionClub
+        BUNDLE_LOADER: $(TEST_HOST)
+schemes:
+  LionClub:
+    build:
+      targets:
+        LionClub: all
+        LionClubTests: [test]
+    test:
+      config: Debug
+      targets:
+        - LionClubTests

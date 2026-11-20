@@ -1,0 +1,101 @@
+name: iOS
+
+# Builds LionClub on a Mac in the cloud: runs the tests, takes Simulator screenshots and makes an
+# unsigned LionClub.ipa that AltStore/SideStore can install with a free Apple ID.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen and ldid
+        run: brew install xcodegen ldid
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+
+      - name: Pick an iPhone simulator
+        id: sim
+        run: echo "udid=$(xcrun simctl list devices available -j | python3 ci/pick_simulator.py)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and test (Simulator)
+        run: |
+          set +e
+          xcodebuild test \
+            -project LionClub.xcodeproj -scheme LionClub \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath build/sim \
+            CODE_SIGNING_ALLOWED=NO > build-sim.log 2>&1
+          status=$?
+          grep -E "error:|\*\* (TEST|BUILD) |Executed [0-9]+ test|Test Case .* failed" build-sim.log | tail -60
+          exit $status
+
+      - name: Simulator screenshots
+        run: bash ci/screenshots.sh "${{ steps.sim.outputs.udid }}"
+
+      - name: Build for iPhone (unsigned)
+        run: |
+          set +e
+          xcodebuild build \
+            -project LionClub.xcodeproj -scheme LionClub -configuration Release \
+            -sdk iphoneos -destination "generic/platform=iOS" \
+            -derivedDataPath build/device \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} > build-device.log 2>&1
+          status=$?
+          grep -E "error:|\*\* BUILD " build-device.log | tail -60
+          exit $status
+
+      - name: Package LionClub.ipa
+        run: bash ci/package-ipa.sh
+
+      - name: Upload the app
+        uses: actions/upload-artifact@v4
+        with:
+          name: LionClub-ipa
+          path: LionClub.ipa
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: shots/
+          if-no-files-found: ignore
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: build-*.log
+          if-no-files-found: ignore
+
+      # A stable download link for the newest build:
+      # https://github.com/pokerbanana/lionclub/releases/latest/download/LionClub.ipa
+      - name: Publish the build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: LionClub build ${{ github.run_number }}
+          body: Unsigned test build of ${{ github.sha }}. Install with AltStore or SideStore.
+          files: LionClub.ipa
+          make_latest: true
