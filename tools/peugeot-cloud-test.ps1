@@ -20,12 +20,20 @@
   Also save each car's status to tools\status-sample-N.json with the VIN, ids, links and GPS
   position removed, to use as test data for the app.
 
+.PARAMETER Pasted
+  The mymap:// address (or just the code) if you already have it. Skips opening the browser.
+
+.PARAMETER FromClipboard
+  Read the mymap:// address from the clipboard instead. Skips opening the browser.
+
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File tools\peugeot-cloud-test.ps1
 #>
 param(
     [string]$Country = 'HR',
-    [switch]$SaveSample
+    [switch]$SaveSample,
+    [string]$Pasted,
+    [switch]$FromClipboard
 )
 
 $ErrorActionPreference = 'Stop'
@@ -94,20 +102,30 @@ $redirect = "$($brand.scheme)://oauth2redirect/$($cc.ToLower())"
 $authUrl = "$($brand.oauth_url)/am/oauth2/authorize?client_id=$($c.client_id)&response_type=code" +
     "&redirect_uri=$redirect&scope=openid%20profile%20email&locale=$($c.locale)"
 
-Write-Host ''
-Write-Host 'Peugeot cloud test' -ForegroundColor Cyan
-Write-Host '1. Peugeot''s login page opens in your browser now.'
-Write-Host '2. BEFORE signing in, press F12 and click the "Console" tab.'
-Write-Host '3. Sign in with your MyPeugeot email and password.'
-Write-Host '4. The page then goes blank and the Console shows a red line like:'
-Write-Host "     Failed to launch 'mymap://oauth2redirect/$($cc.ToLower())?code=...'"
-Write-Host '   Copy that mymap:// address and paste it below.'
-Write-Host '   The code only works for about a minute, so be quick.'
-Write-Host ''
-Start-Process $authUrl
-$pasted = Read-Host 'Paste the mymap:// address (or just the code)'
+if ($FromClipboard) {
+    $Pasted = Get-Clipboard -Raw
+    if ($null -eq $Pasted -or $Pasted -notmatch 'code=') {
+        Write-Host 'The clipboard has no mymap:// address with a code in it. Copy it again and rerun.' -ForegroundColor Red
+        exit 1
+    }
+}
 
-if ($pasted -match 'code=([^&\s''"]+)') { $authCode = $Matches[1] } else { $authCode = $pasted.Trim() }
+if ([string]::IsNullOrWhiteSpace($Pasted)) {
+    Write-Host ''
+    Write-Host 'Peugeot cloud test' -ForegroundColor Cyan
+    Write-Host '1. Peugeot''s login page opens in your browser now.'
+    Write-Host '2. BEFORE signing in, press F12 and click the "Console" tab.'
+    Write-Host '3. Sign in with your MyPeugeot email and password.'
+    Write-Host '4. The page then goes blank and the Console shows a red line like:'
+    Write-Host "     Failed to launch 'mymap://oauth2redirect/$($cc.ToLower())?code=...'"
+    Write-Host '   Copy that mymap:// address and paste it below.'
+    Write-Host '   The code only works for about a minute, so be quick.'
+    Write-Host ''
+    Start-Process $authUrl
+    $Pasted = Read-Host 'Paste the mymap:// address (or just the code)'
+}
+
+if ($Pasted -match 'code=([^&\s''"]+)') { $authCode = $Matches[1] } else { $authCode = $Pasted.Trim() }
 if ([string]::IsNullOrWhiteSpace($authCode)) {
     Write-Host 'Nothing was pasted.' -ForegroundColor Red
     exit 1

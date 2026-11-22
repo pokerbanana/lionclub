@@ -40,7 +40,7 @@ With a free Apple ID, the app has to be refreshed every 7 days. Both tools can d
 The current build checks that everything the real app needs works on your iPhone. In the **Checks** tab:
 1. **Widget:** add the LionClub widget to the Home Screen, then tap "Send a test value to the widget". The time on the widget should change.
 2. **Face ID:** tap "Test Face ID".
-3. **Peugeot login:** tap "Open Peugeot login (Croatia)" and sign in. It should say Peugeot sent a code back.
+3. **Peugeot cloud test:** tap "Sign in to Peugeot and test" and sign in on Peugeot's page. It shows what Peugeot's servers know about the car and whether it's live (Plan A) or not (Plan B). This is the same check as the Windows script.
 4. **Siri and Control Center:** say "Test LionClub" to Siri, or add the "Test LionClub" button to Control Center and tap it.
 5. **Parking spot:** allow location. Then, in Shortcuts, create an automation for when CarPlay or Bluetooth disconnects that runs "Save Parking Spot".
 

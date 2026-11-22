@@ -12,7 +12,9 @@ struct ChecksView: View {
 
     @State private var widgetResult = ""
     @State private var faceIDResult = "Not tested yet"
-    @State private var loginResult = "Not tested yet"
+    @State private var cloudRunning = false
+    @State private var cloudMessage = "Not run yet"
+    @State private var cloudReports: [CloudTestReport] = []
     @State private var lastPing = Ping.load()
     @State private var lastSpot = ParkingSpot.load()
 
@@ -48,16 +50,31 @@ struct ChecksView: View {
                 }
 
                 Section {
-                    Button("Open Peugeot login (Croatia)") {
-                        Task { loginResult = await testPeugeotLogin() }
+                    Button(cloudRunning ? "Testing..." : "Sign in to Peugeot and test") {
+                        Task { await runCloudTest() }
                     }
-                    Text(loginResult)
+                    .disabled(cloudRunning)
+                    Text(cloudMessage)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                    ForEach(cloudReports) { report in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(report.vinEnd.isEmpty ? report.carName : "\(report.carName) (VIN ending \(report.vinEnd))")
+                                .font(.headline)
+                            ForEach(report.lines, id: \.self) { line in
+                                Text(line)
+                                    .font(.footnote)
+                            }
+                            Text(report.verdictText)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(report.isLive ? Color.green : Color.orange)
+                        }
+                        .padding(.vertical, 4)
+                    }
                 } header: {
-                    Text("3. Peugeot login")
+                    Text("3. Peugeot cloud test")
                 } footer: {
-                    Text("Checks that Peugeot's login page opens and sends a code back to LionClub. The code isn't used or stored.")
+                    Text("Signs in on Peugeot's own page with your Croatian MyPeugeot account, then asks Peugeot's servers what they know about your car. The sign-in stays in memory only, and nothing is saved.")
                 }
 
                 Section {
@@ -124,7 +141,12 @@ struct ChecksView: View {
         }
     }
 
-    private func testPeugeotLogin() async -> String {
+    /// Signs in on Peugeot's page, then reads the cars and their status from Peugeot's servers.
+    private func runCloudTest() async {
+        cloudRunning = true
+        cloudReports = []
+        cloudMessage = "Waiting for Peugeot's sign-in..."
+        defer { cloudRunning = false }
         do {
             let config = try PeugeotConfig.load(country: "HR")
             let callback = try await webAuthenticationSession.authenticate(
@@ -132,14 +154,35 @@ struct ChecksView: View {
                 callbackURLScheme: config.scheme
             )
             let items = URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems ?? []
-            if items.contains(where: { $0.name == "code" }) {
-                return "Works: Peugeot sent a sign-in code back to LionClub."
+            guard let code = items.first(where: { $0.name == "code" })?.value else {
+                cloudMessage = "Peugeot didn't send a sign-in code back."
+                return
             }
-            return "Came back without a code."
+            cloudMessage = "Signed in. Asking Peugeot's servers about your car..."
+            let client = try await PeugeotClient.signIn(config: config, code: code)
+            let vehicles = try await client.vehicles()
+            if vehicles.isEmpty {
+                cloudMessage = "Peugeot's cloud lists no car on this account, so it'll be the offline companion (Plan B)."
+                return
+            }
+            let remoteLink = await client.hasRemoteServicesLink()
+            var reports: [CloudTestReport] = []
+            for vehicle in vehicles {
+                let status = try? await client.status(vehicleID: vehicle["id"] as? String ?? "")
+                let maintenance = await client.maintenance(vehicle: vehicle)
+                reports.append(CloudTestReport.make(
+                    vehicle: vehicle,
+                    status: status,
+                    maintenance: maintenance,
+                    remoteLink: remoteLink
+                ))
+            }
+            cloudReports = reports
+            cloudMessage = "Done. Nothing was saved."
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
-            return "Cancelled."
+            cloudMessage = "Cancelled."
         } catch {
-            return "Failed: \(error.localizedDescription)"
+            cloudMessage = "Failed: \(error.localizedDescription)"
         }
     }
 }
